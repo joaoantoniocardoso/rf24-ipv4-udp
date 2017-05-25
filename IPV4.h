@@ -1,6 +1,13 @@
 #ifndef _IPV4_H
 #define _IPV4_H
 
+#include <Arduino.h>
+#include <stdint.h>
+#include "checksum.h"
+
+//typedef unsigned char uint8_t
+//typedef unsigned int uint16_t
+
 #define IPV4_VERSION                4
 #define IPV4_IHL                    5
 #define IPV4_TOS                    0         
@@ -15,33 +22,36 @@
 #define IPV4_PROTO_TCP              0x06
 
 struct iphdr{
-    unsigned char version : 4;
-    unsigned char ihl : 4;
-    unsigned char tos;
-    unsigned int len;
-    unsigned int id;
-    unsigned int flags : 3;
-    unsigned int frag_offset : 13;
-    unsigned char ttl;
-    unsigned char proto;
-    unsigned int csum;
-    unsigned long saddr;
-    unsigned long daddr;
+    uint8_t version : 4;
+    uint8_t ihl : 4;
+    uint8_t tos;
+    uint16_t len;
+    uint16_t id;
+    uint16_t flags : 3;
+    uint16_t frag_offset : 13;
+    uint8_t ttl;
+    uint8_t proto;
+    uint16_t csum;
+    uint32_t saddr;
+    uint32_t daddr;
 } __attribute__((packed));
 
 struct ippkg{
     struct iphdr *header;
-    unsigned char *data;
+    uint8_t *data;
 } __attribute__((packed));
 
-void mkHeader(      
-        struct iphdr *header, 
-        unsigned int saddr, 
-        unsigned int daddr);
+void mkHeader(
+    struct iphdr *header, 
+    uint32_t saddr, 
+    uint32_t daddr);
+
 void makePackage(
-        struct iphdr *header, 
-        unsigned char *data, 
-        unsigned dataLengh, 
-        struct ippkg *package);
+    struct iphdr *header, 
+    uint8_t *data, 
+    uint8_t dataLenght, 
+    struct ippkg *package);
+
+uint32_t inet_addr(const char *strAddr);
 
 #endif /* ifndef _IPV4_H */
