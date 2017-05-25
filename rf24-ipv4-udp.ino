@@ -22,7 +22,7 @@ const uint8_t num_channels = 128;
 uint8_t values[num_channels];
 
 // Used to control whether this node is sending or receiving
-char role = 2;      // starts in standby
+char role = 99;      // starts in standby
 
 /****************** Function Prototypes *******************/
 
@@ -58,13 +58,14 @@ void loop()
     case 2:
         radioScanLoop();
         break;
+    case 99:
     default:
         // Just do nothing
         break;
     }
 
   /****************** Change Roles via Serial Commands ***************************/
-    serialEventsLoop();
+  serialEventsLoop();
 
 }
 
@@ -120,10 +121,10 @@ inline void radioScanLoop(void)
     // Print out channel measurements, clamped to a single hex digit
     int i = 0;
     while ( i < num_channels ){
-        printf("%x",min(0xf,values[i]&0xf));
+        Serial.print(min(0xf,values[i]&0xf), HEX);
         ++i;
     }
-    printf("\n\r");
+    Serial.print("\n\r");
 }
 
 inline void radioReceiveLoop(void)
@@ -152,34 +153,37 @@ inline void radioReceiveLoop(void)
 
         bool err = false;
 
-        // verifica o checksum
-        err = !check_csum(headertmp, sizeof(mheader), 10);
+        // verifica o checksum e verifica se a mensagem é para ele
+        if(!check_csum(headertmp, sizeof(mheader), 10)){
+            Serial.println("checksum error, message discarded.");
+            err = true;
+        } else if(mheader.daddr != local_ip || (mheader.daddr != broadcast_ip)){
+            Serial.println("message discarded");
+            err = true;
+        }
 
-        // verifica se a mensagem é para ele
-        err = !(mheader.daddr != local_ip || (mheader.daddr != broadcast_ip));
+        if(!err){
+            // espera encher o buffer para ter pelo menos o tamanho indicado no cabeçalho
+            while (radio.available() < (mheader.len -20));
 
-        // espera encher o buffer para ter pelo menos o tamanho indicado no cabeçalho
-        while (radio.available() < (mheader.len -20));
+            // associa os dados com o pacote (na função de transmissão isto é feito dentro da função makePackage() )
+            mpkg.data = tmp;
 
-        // associa os dados com o pacote (na função de transmissão isto é feito dentro da função makePackage() )
-        mpkg.data = tmp;
+            radio.read(tmp, mheader.len -20);
+            //////////////////////////// TODO: MOSTRAR MENSAGEM PARA A CAMADA DE APLICAÇÃO
 
-        radio.read(tmp, mheader.len -20);
+            // radio.read(&tmp, mheader.len);
+
+            // Serial.print("got Message: ");
+            // Serial.println(got_msg, HEX);
+
+            // radio.stopListening();                                        // First, stop listening so we can talk
+            // radio.write( &got_msg, sizeof(got_msg) );               // Send the final one back.
+            // radio.startListening();                                       // Now, resume listening so we catch the next packets.
+            // Serial.print(F("Sent response "));
+            // Serial.println(got_msg);
+        }
     }
-
-//////////////////////////// TODO: MOSTRAR MENSAGEM PARA A CAMADA DE APLICAÇÃO
-
-        // radio.read(&tmp, mheader.len);
-
-        // Serial.print("got Message: ");
-        // Serial.println(got_msg, HEX);
-
-        // radio.stopListening();                                        // First, stop listening so we can talk
-        // radio.write( &got_msg, sizeof(got_msg) );               // Send the final one back.
-        // radio.startListening();                                       // Now, resume listening so we catch the next packets.
-        // Serial.print(F("Sent response "));
-        // Serial.println(got_msg);
-    //}
 }
 
 inline void radioTransmitLoop(void)
@@ -285,91 +289,92 @@ inline void printSerialCommands(void)
 inline void serialEventsLoop(void)
 {
     if ( Serial.available() ) {
-    char c = toupper(Serial.read());
-    if ( ((c == 'T') || (c == 't')) && (role != 1) ) {
-        Serial.println(F("*** CHANGING TO TRANSMIT ROLE -- PRESS 'R' TO SWITCH BACK"));
-        role = 1;                // Become the primary transmitter
-        radio.stopListening();
+        char c = toupper(Serial.read());
+        if ( (c == 'T') || (c == 't') ){
+            Serial.println(F("*** CHANGING TO TRANSMIT ROLE -- PRESS 'R' TO SWITCH BACK"));
+            role = 1;                // Become the primary transmitter
+            radio.stopListening();
 
-    } else if ( ((c == 'R') || (c == 'r')) && (role != 0) ) {
-        Serial.println(F("*** CHANGING TO RECEIVE ROLE -- PRESS 'T' TO SWITCH BACK"));
-        role = 0;                // Become the primary receiver
-        radio.startListening();
+        } else if ( (c == 'R') || (c == 'r') ){
+            Serial.println(F("*** CHANGING TO RECEIVE ROLE -- PRESS 'T' TO SWITCH BACK"));
+            role = 0;                // Become the primary receiver
+            radio.startListening();
 
-    } else if (c == '?') {
-        printConfigs();
+        } else if (c == '?') {
+            printConfigs();
 
-    } else if (c == '0') {
-        role = 2;               // Just stands by
-        radio.stopListening();
-        Serial.println(F("Transmit/Receive OFF"));
+        } else if (c == '0') {
+            role = 99;               // Just stands by
+            radio.stopListening();
+            Serial.println(F("Transmit/Receive OFF"));
 
-    } else if ((c == 'S') || (c == 's')) {
-        Serial.println(F("*** CHANGING TO SCAN"));
+        } else if ( (c == 'S') || (c == 's') ){
+            Serial.println(F("*** CHANGING TO SCAN"));
 
-        // Print out header, high then low digit
-        int i = 0;
-        while ( i < num_channels ){
-            printf("%x",i>>4);
-            ++i;
-        }
-        Serial.println("");
-        i = 0;
-        while ( i < num_channels ){
-            printf("%x",i&0xf);
-            ++i;
-        }
-        Serial.println("");
-    } else if ( ((c == 'D') || (c == 'd')) ) {
-        Serial.println(F("*** PLEASE SEND THE DESTINATION IP (xxx.xxx.xxx.xxx): "));
-        
-        uint32_t started_waiting_at = millis();
-        bool timeout = false;
+            // Print out header, high then low digit
+            int i = 0;
+            while ( i < num_channels ){
+                Serial.print((i>>4)&0xf, HEX);
+                ++i;
+            }
+            Serial.println("");
+            i = 0;
+            while ( i < num_channels ){
+                Serial.print(i&0xf, HEX);
+                ++i;
+            }
+            Serial.println("");
+            role = 2;
 
-        while(Serial.available() < 15){
-            if(millis() - started_waiting_at > 10000){
-                timeout = true;
-                break;
+        } else if ( (c == 'D') || (c == 'd') ) {
+            Serial.println(F("*** PLEASE SEND THE DESTINATION IP (xxx.xxx.xxx.xxx): "));
+
+            uint32_t started_waiting_at = millis();
+            bool timeout = false;
+
+            while(Serial.available() < 15){
+                if(millis() - started_waiting_at > 10000){
+                    timeout = true;
+                    break;
+                }
+            } 
+            if(timeout) Serial.println("...ops, timeout!");
+            else {
+                char ip[15];
+                // read as a char array
+                for(int i = 0; i < 15; i++) ip[i] = Serial.read();
+                ip[15] = '\0'; // then terminate the string with null byte
+
+                remote_ip = inet_addr(ip);
+            }
+
+        } else if ( (c == 'L') || (c == 'l') ) {
+            Serial.println(F("*** PLEASE SEND THE LOCAL IP (xxx.xxx.xxx.xxx): "));
+
+            uint32_t started_waiting_at = millis();
+            bool timeout = false;
+
+            while(Serial.available() < 15){
+                if(millis() - started_waiting_at > 10000){
+                    timeout = true;
+                    break;
+                    }
+            } 
+            if(timeout) Serial.println("...ops, timeout!");
+            else {
+                char ip[15];
+                // read as a char array
+                for(int i = 0; i < 15; i++) ip[i] = Serial.read();
+                ip[15] = '\0'; // then terminate the string with null byte
+
+                local_ip = inet_addr(ip);
+                broadcast_ip = local_ip | 255;
+                Serial.print("got");
+                Serial.print(ip);
+                Serial.print(" (");
+                Serial.print(local_ip, DEC);
+                Serial.println(")");
             }
         } 
-        if(timeout) Serial.println("...ops, timeout!");
-        else {
-            char ip[15];
-            // read as a char array
-            for(int i = 0; i < 15; i++) ip[i] = Serial.read();
-            ip[15] = '\0'; // then terminate the string with null byte
-
-            remote_ip = inet_addr(ip);
-        }
-
-    } else if ( ((c == 'L') || (c == 'l')) ) {
-        Serial.println(F("*** PLEASE SEND THE LOCAL IP (xxx.xxx.xxx.xxx): "));
-        
-        uint32_t started_waiting_at = millis();
-        bool timeout = false;
-
-        while(Serial.available() < 15){
-            if(millis() - started_waiting_at > 10000){
-                timeout = true;
-                break;
-            }
-        } 
-        if(timeout) Serial.println("...ops, timeout!");
-        else {
-            char ip[15];
-            // read as a char array
-            for(int i = 0; i < 15; i++) ip[i] = Serial.read();
-            ip[15] = '\0'; // then terminate the string with null byte
-
-            local_ip = inet_addr(ip);
-            broadcast_ip = local_ip | 255;
-            Serial.print("got");
-            Serial.print(ip);
-            Serial.print(" (");
-            Serial.print(local_ip, DEC);
-            Serial.println(")");
-        }
-
     } 
-  } 
 }
