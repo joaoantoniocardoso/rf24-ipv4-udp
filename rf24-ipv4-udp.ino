@@ -7,9 +7,9 @@
 /***      Set this radio as radio number 0 or 1         ***/
 #define TIMEOUT_US  200000      // 200ms
 bool radioNumber = 0;           // 
-    uint32_t local_ip = 0;
-    uint32_t remote_ip = 0;
-    uint32_t broadcast_ip = 0;
+uint32_t local_ip = 0;
+uint32_t remote_ip = 0;
+uint32_t broadcast_ip = 0;
 
 /* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 7 & 8 */
 RF24 radio(7, 8);   //mosi miso
