@@ -151,39 +151,47 @@ inline void radioReceiveLoop(void)
         // conversão para o ponteiro que a função pede (no caso, int* ao invés de struct mheader )
         int *headertmp = (int *) &mheader; 
 
-        bool err = false;
-
         // verifica o checksum e verifica se a mensagem é para ele
         if(!check_csum(headertmp, sizeof(mheader), 10)){
             Serial.println("checksum error, message discarded.");
-            err = true;
-        } else if(mheader.daddr != local_ip || (mheader.daddr != broadcast_ip)){
+
+            // verifica se a mensagem é para ele \/ \/ \/ \/
+        }else if(mheader.daddr != local_ip || (mheader.daddr != broadcast_ip)){
             Serial.println("message discarded");
-            err = true;
-        }
 
-        if(!err){
-            // espera encher o buffer para ter pelo menos o tamanho indicado no cabeçalho
-            while (radio.available() < (mheader.len -20));
+            // TODO: RETRANSMITIR!
 
-            // associa os dados com o pacote (na função de transmissão isto é feito dentro da função makePackage() )
-            mpkg.data = tmp;
+        }else{ // verifica o checksum, já que a mensagem é para ele
+            if(!check_csum(headertmp, sizeof(mheader), 10)){
+                Serial.println("checksum error, message discarded.");
 
-            radio.read(tmp, mheader.len -20);
-            //////////////////////////// TODO: MOSTRAR MENSAGEM PARA A CAMADA DE APLICAÇÃO
+            }else{ // checksum correto, recebe a mensagem
+                // espera encher o buffer para ter pelo menos o tamanho indicado no cabeçalho
+                while (radio.available() < (mheader.len -20));
 
-            // radio.read(&tmp, mheader.len);
+                // associa os dados com o pacote (na função de transmissão isto é feito dentro da função makePackage() )
+                mpkg.data = tmp;
 
-            // Serial.print("got Message: ");
-            // Serial.println(got_msg, HEX);
+                radio.read(tmp, mheader.len -20);
 
-            // radio.stopListening();                                        // First, stop listening so we can talk
-            // radio.write( &got_msg, sizeof(got_msg) );               // Send the final one back.
-            // radio.startListening();                                       // Now, resume listening so we catch the next packets.
-            // Serial.print(F("Sent response "));
-            // Serial.println(got_msg);
+                Serial.print("got Message: ");
+                
+                for(char c = 0; mheader.len -20; c++){
+                    Serial.print(mpkg.data[c], HEX);
+                }
+                Serial.println();
+                
+
+                //radio.stopListening();                                        // First, stop listening so we can talk
+                //radio.write( &got_msg, sizeof(got_msg) );               // Send the final one back.
+                //radio.startListening();                                       // Now, resume listening so we catch the next packets.
+                //Serial.print(F("Sent response "));
+                //Serial.println(got_msg);
+            }
         }
     }
+
+    free(tmp);
 }
 
 inline void radioTransmitLoop(void)
