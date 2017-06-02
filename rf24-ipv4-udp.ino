@@ -86,11 +86,15 @@ inline void radioSetup(void)
         radio.openReadingPipe(1, addresses[1]);
     }
     
-    radio.enableAckPayload();
-    radio.enableDynamicPayloads();
+    //radio.enableAckPayload();
+    //radio.enableDynamicPayloads();
+
+    local_ip = 0xC0A80001;//inet_addr("192.168.0.1");
+    remote_ip = 0xC0A80002;//inet_addr("192.168.0.2");
 
     // Start the radio listening for data
     radio.startListening(); 
+
 }
 
 const int num_reps = 100;
@@ -133,6 +137,10 @@ inline void radioReceiveLoop(void)
     struct          iphdr mheader;
     struct          ippkg mpkg;
 
+    // clears the memory
+    memset((void*) &mheader,0,sizeof(mheader));
+    memset((void*) &mpkg,0,sizeof(mpkg));
+
     // cria uma variável local do tamanho indicado pelo cabeçalho, para receber os dados
     uint8_t *tmp = (uint8_t *) malloc(4*sizeof(uint8_t));
 
@@ -142,22 +150,23 @@ inline void radioReceiveLoop(void)
     // se tiver dados no buffer de recebimento
     if (radio.available()) {
 
+        //Serial.println("serial available!");
+
         // espera encher o buffer para ter pelo menos o tamanho do cabeçalho
-        while (radio.available() < 20);
+        //while (radio.getDynamicPayloadSize() < 20);
 
         // passa os bytes do buffer de recebimento (20 bytes) para o cabeçalho alocado (mheader)
         radio.read(&mheader, sizeof(mheader));
 
+        printHeader(&mheader);
+
         // conversão para o ponteiro que a função pede (no caso, int* ao invés de struct mheader )
         int *headertmp = (int *) &mheader; 
 
-        // verifica o checksum e verifica se a mensagem é para ele
-        if(!check_csum(headertmp, sizeof(mheader), 10)){
-            Serial.println("checksum error, message discarded.");
-
-            // verifica se a mensagem é para ele \/ \/ \/ \/
-        }else if(mheader.daddr != local_ip || (mheader.daddr != broadcast_ip)){
-            Serial.println("message discarded");
+        // verifica se a mensagem é para ele
+        if(mheader.daddr != local_ip || (mheader.daddr != broadcast_ip)){
+            Serial.print("message discarded, the ip was: ");
+            Serial.println(mheader.daddr, HEX);
 
             // TODO: RETRANSMITIR!
 
@@ -181,12 +190,11 @@ inline void radioReceiveLoop(void)
                 }
                 Serial.println();
                 
-
-                //radio.stopListening();                                        // First, stop listening so we can talk
-                //radio.write( &got_msg, sizeof(got_msg) );               // Send the final one back.
-                //radio.startListening();                                       // Now, resume listening so we catch the next packets.
-                //Serial.print(F("Sent response "));
-                //Serial.println(got_msg);
+                // radio.stopListening();                                        // First, stop listening so we can talk
+                // radio.write( &got_msg, sizeof(got_msg) );               // Send the final one back.
+                // radio.startListening();                                       // Now, resume listening so we catch the next packets.
+                // Serial.print(F("Sent response "));
+                // Serial.println(got_msg);
             }
         }
     }
@@ -198,14 +206,20 @@ inline void radioTransmitLoop(void)
 {
     radio.stopListening();                                    // First, stop listening so we can talk.
 
-    struct          iphdr mheader;
-    struct          ippkg mpkg;
+    struct iphdr mheader;
+    struct ippkg mpkg;
+
+    // clears the memory
+    memset((void*) &mheader,0,sizeof(mheader));
+    memset((void*) &mpkg,0,sizeof(mpkg));
 
     mkHeader(&mheader, local_ip, remote_ip);
 
     uint8_t mymsg[] = {0x1, 0x2, 0x3, 0x4};
 
     makePackage(&mheader, mymsg, sizeof(mymsg), &mpkg);
+
+    printHeader(&mheader);
 
     Serial.println(F("Now sending"));
 
@@ -243,7 +257,7 @@ inline void radioTransmitLoop(void)
         Serial.print(mpkg.data[3], HEX);
         Serial.print(F(", Round-trip delay "));
         Serial.print(end_time - start_time);
-        Serial.println(F(" microseconds"));
+        Serial.println(F(" ms."));
 
     }
 
@@ -377,10 +391,10 @@ inline void serialEventsLoop(void)
 
                 local_ip = inet_addr(ip);
                 broadcast_ip = local_ip | 255;
-                Serial.print("got");
+                Serial.print("got: ");
                 Serial.print(ip);
                 Serial.print(" (");
-                Serial.print(local_ip, DEC);
+                Serial.print(local_ip, HEX);
                 Serial.println(")");
             }
         } 

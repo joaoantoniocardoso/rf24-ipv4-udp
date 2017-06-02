@@ -26,13 +26,48 @@ void mkHeader(struct iphdr *header, uint32_t saddr, uint32_t daddr)
 }
 
 /**
+ * @brief prints the header as byte array
+ * @param *header is a pointer to the prealocated header
+ */
+void printHeaderAsBytes(struct iphdr *header)
+{
+    Serial.println( "----------->PACKAGE:" );
+    char *tmsg = (char *) header;
+    for(char       c =0 ; c < sizeof(header); c++){
+        Serial.print(tmsg[c], HEX);
+        Serial.print(',');
+    }
+    Serial.println();
+}
+
+/**
+ * @brief prints the header
+ * @param *header is a pointer to the prealocated header
+ */
+void printHeader(struct iphdr *header)
+{
+    Serial.println( "----------->PACKAGE:" );
+    Serial.print( "version:\t" ); Serial.println( (*header).version );
+    Serial.print( "tos:\t\t" ); Serial.println( (*header).tos );
+    Serial.print( "len:\t\t" ); Serial.println( (*header).len );
+    Serial.print( "id:\t\t" ); Serial.println( (*header).id );
+    Serial.print( "flags:\t\t" ); Serial.println( (*header).flags );
+    Serial.print( "ttl:\t\t" ); Serial.println( (*header).ttl );
+    Serial.print( "proto:\t\t" ); Serial.println( (*header).proto );
+    Serial.print( "csum:\t\t" ); Serial.println( (*header).csum );
+    Serial.print( "saddr:\t\t" ); Serial.println( (*header).saddr );
+    Serial.print( "daddr:\t\t" ); Serial.println( (*header).daddr );
+    Serial.println();
+}
+
+/**
 * @brief Packs the header and the data into a package
 * @param *header is a pointer to the prealocated header
 * @param *data is a pointer to the prealocated data
 * @param dataLenght is the lenght of data
 * @param *package is a pointer to the prealocated package
 */ 
-void makePackage(struct iphdr *header, uint8_t *data, uint8_t dataLenght, struct ippkg *package)
+void makePackage(struct iphdr *header, uint8_t *data, uint16_t dataLenght, struct ippkg *package)
 {
     (*header).len += dataLenght;
 
