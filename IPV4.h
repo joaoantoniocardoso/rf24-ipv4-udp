@@ -16,7 +16,7 @@
 #define IPV4_FRAG_OFFSET            0
 #define IPV4_TTL_MIN                1
 #define IPV4_TTL_MAX                128
-#define IPV4_PROTO_TCP              0x06
+#define IPV4_PROTO_TCP              6
 
 struct __attribute__((packed)) iphdr{
     uint8_t version : 4;
